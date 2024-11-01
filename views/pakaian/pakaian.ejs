@@ -1,0 +1,230 @@
+<!-- views/pakaian/pakaian.ejs -->
+
+<div class="content flex-grow-1">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Products</h2>
+    <div>
+      <button class="btn btn-outline-primary me-2">Export</button>
+      <button
+        class="btn btn-primary"
+        onclick="window.location.href='/api/pakaian/create'"
+      >
+        + Tambah Produk
+      </button>
+    </div>
+  </div>
+
+  <!-- Alert untuk notifikasi -->
+  <div id="alertContainer"></div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between mb-3">
+        <div class="d-flex gap-2" style="width: 600px">
+          <!-- Filter Dropdown -->
+          <select id="categoryFilter" class="form-select" style="width: 200px">
+            <option value="">Semua Kategori</option>
+            <% for(var i=0; i<kategoriList.length; i++) { %>
+              <option value="<%= kategoriList[i].id_kategori_pakaian %>">
+                <%= kategoriList[i].nama_kategori_pakaian %>
+              </option>
+            <% } %>
+          </select>
+
+          <!-- Search Input -->
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="searchInput" 
+              class="form-control" 
+              placeholder="Cari produk..."
+            >
+            <button class="btn btn-outline-secondary" type="button" id="searchButton">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Inventory</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productTableBody">
+            <% if (pakaianList.length > 0) { %> 
+              <% for(var i=0; i<pakaianList.length; i++) { %>
+              <tr data-category="<%= pakaianList[i].id_kategori_pakaian %>" data-id="<%= pakaianList[i].id_pakaian %>">
+                <td>
+                  <div class="d-flex align-items-center">
+                    <div>
+                      <div class="fw-bold"><%= pakaianList[i].nama_pakaian %></div>
+                      <small class="text-muted"><%= pakaianList[i].kode_sku || '-' %></small>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <% 
+                    var kategori = kategoriList.find(function(k) { 
+                      return k.id_kategori_pakaian === pakaianList[i].id_kategori_pakaian 
+                    });
+                  %>
+                  <%= kategori ? kategori.nama_kategori_pakaian : 'Uncategorized' %>
+                </td>
+                <td><%= pakaianList[i].total_stok %></td>
+                <td>Rp <%= pakaianList[i].harga.toLocaleString('id-ID') %></td>
+                <td>
+                  <span class="badge <%= pakaianList[i].status_produk === 'active' ? 'bg-success' : 'bg-secondary' %>">
+                    <%= pakaianList[i].status_produk %>
+                  </span>
+                </td>
+                <td>
+                  <div class="btn-group">
+                    <a
+                      href="/api/pakaian/<%= pakaianList[i].id_pakaian %>"
+                      class="btn btn-outline-primary btn-sm"
+                    >
+                      <i class="fas fa-eye"></i>
+                    </a>
+                    <button 
+                      type="button"
+                      class="btn btn-outline-danger btn-sm delete-product"
+                      data-id="<%= pakaianList[i].id_pakaian %>"
+                      onclick="deleteProduct(<%= pakaianList[i].id_pakaian %>)"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <% } %>
+            <% } else { %>
+              <tr>
+                <td colspan="6" class="text-center">Tidak ada produk tersedia</td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <nav>
+          <ul class="pagination mb-0">
+            <% for(var i=1; i<=pagination.total_pages; i++) { %>
+              <li class="page-item <%= pagination.current_page === i ? 'active' : '' %>">
+                <a 
+                  class="page-link" 
+                  href="javascript:void(0)"
+                  onclick="changePage(<%= i %>)"
+                >
+                  <%= i %>
+                </a>
+              </li>
+            <% } %>
+          </ul>
+        </nav>
+        <div><%= pagination.total_items %> Results</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Inisialisasi variabel untuk pencarian dan filter
+  var searchInput = document.getElementById('searchInput');
+  var categoryFilter = document.getElementById('categoryFilter');
+  var tbody = document.getElementById('productTableBody');
+  var rows = tbody.getElementsByTagName('tr');
+  
+  // Function untuk menampilkan alert
+  function showAlert(message, type) {
+    type = type || 'success';
+    var alertContainer = document.getElementById('alertContainer');
+    var alertHTML = [
+      '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">',
+      message,
+      '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+      '</div>'
+    ].join('');
+    alertContainer.innerHTML = alertHTML;
+  }
+
+  // Function untuk filter dan search
+  function filterProducts() {
+    var searchTerm = searchInput.value.toLowerCase();
+    var selectedCategory = categoryFilter.value;
+
+    for(var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var nameCell = row.querySelector('td:first-child');
+      if (!nameCell) continue;
+      
+      var productName = nameCell.textContent.toLowerCase();
+      var category = row.getAttribute('data-category');
+      
+      var matchesSearch = productName.indexOf(searchTerm) > -1;
+      var matchesCategory = !selectedCategory || category === selectedCategory;
+      
+      row.style.display = matchesSearch && matchesCategory ? '' : 'none';
+    }
+  }
+
+  // Event listeners untuk search dan filter
+  searchInput.addEventListener('input', filterProducts);
+  categoryFilter.addEventListener('change', filterProducts);
+
+  // Function untuk delete produk
+  window.deleteProduct = function(productId) {
+    if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+      return;
+    }
+
+    fetch('/api/pakaian/' + productId, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(function(response) {
+      return response.json();
+    })
+    .then(function(result) {
+      if (!result.status === 'success') {
+        throw new Error(result.message || 'Error deleting product');
+      }
+
+      // Hapus row dari tabel
+      var row = document.querySelector('tr[data-id="' + productId + '"]');
+      if (row) {
+        row.remove();
+      }
+
+      showAlert('Produk berhasil dihapus!');
+
+      // Refresh halaman setelah 1 detik
+      setTimeout(function() {
+        window.location.reload();
+      }, 1000);
+    })
+    .catch(function(error) {
+      showAlert(error.message, 'danger');
+      console.error('Error:', error);
+    });
+  };
+
+  // Function untuk pagination
+  window.changePage = function(page) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+    window.location.href = url.toString();
+  };
+});
+</script>

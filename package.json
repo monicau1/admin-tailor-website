@@ -10,11 +10,15 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "body-parser": "^1.20.3",
     "bootstrap": "^5.3.3",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.21.0",
-    "mysql2": "^3.11.3"
+    "express-ejs-layouts": "^2.5.1",
+    "method-override": "^3.0.0",
+    "mysql2": "^3.11.3",
+    "sequelize": "^6.37.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"
